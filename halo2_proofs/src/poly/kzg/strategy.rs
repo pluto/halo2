@@ -24,9 +24,9 @@ pub struct GuardKZG<'params, E: MultiMillerLoop + Debug> {
 /// Define accumulator type as `DualMSM`
 impl<'params, E> Guard<KZGCommitmentScheme<E>> for GuardKZG<'params, E>
 where
-    E::Scalar: PrimeField,
+    E::Fr: PrimeField,
     E: MultiMillerLoop + Debug,
-    E::G1Affine: SerdeCurveAffine,
+    E::G1Affine: SerdeCurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
     E::G2Affine: SerdeCurveAffine,
 {
     type MSMAccumulator = DualMSM<'params, E>;
@@ -85,8 +85,8 @@ impl<
         >,
     > VerificationStrategy<'params, KZGCommitmentScheme<E>, V> for AccumulatorStrategy<'params, E>
 where
-    E::Scalar: PrimeField,
-    E::G1Affine: SerdeCurveAffine,
+    E::Fr: PrimeField,
+    E::G1Affine: SerdeCurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
     E::G2Affine: SerdeCurveAffine,
 {
     type Output = Self;
@@ -99,7 +99,7 @@ where
         mut self,
         f: impl FnOnce(V::MSMAccumulator) -> Result<V::Guard, Error>,
     ) -> Result<Self::Output, Error> {
-        self.msm_accumulator.scale(E::Scalar::random(OsRng));
+        self.msm_accumulator.scale(E::Fr::random(OsRng));
 
         // Guard is updated with new msm contributions
         let guard = f(self.msm_accumulator)?;
@@ -124,8 +124,8 @@ impl<
         >,
     > VerificationStrategy<'params, KZGCommitmentScheme<E>, V> for SingleStrategy<'params, E>
 where
-    E::Scalar: PrimeField,
-    E::G1Affine: SerdeCurveAffine,
+    E::Fr: PrimeField,
+    E::G1Affine: SerdeCurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
     E::G2Affine: SerdeCurveAffine,
 {
     type Output = ();
@@ -144,7 +144,7 @@ where
         if msm.check() {
             Ok(())
         } else {
-            Err(Error::ConstraintSystemFailure)
+            Err(Error::MSMVerificationError)
         }
     }
 

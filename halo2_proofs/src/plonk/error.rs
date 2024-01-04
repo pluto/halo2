@@ -16,6 +16,8 @@ pub enum Error {
     InvalidInstances,
     /// The constraint system is not satisfied.
     ConstraintSystemFailure,
+    /// Failure in MSM Verification
+    MSMVerificationError,
     /// Out of bounds index passed to a backend
     BoundsFailure,
     /// Opening error
@@ -61,6 +63,7 @@ impl fmt::Display for Error {
             Error::Synthesis => write!(f, "General synthesis error"),
             Error::InvalidInstances => write!(f, "Provided instances do not match the circuit"),
             Error::ConstraintSystemFailure => write!(f, "The constraint system is not satisfied"),
+            Error::MSMVerificationError => write!(f, "The MSM verification failed"),
             Error::BoundsFailure => write!(f, "An out-of-bounds index was passed to the backend"),
             Error::Opening => write!(f, "Multi-opening proof was invalid"),
             Error::Transcript(e) => write!(f, "Transcript error: {}", e),

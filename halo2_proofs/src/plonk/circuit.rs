@@ -2370,6 +2370,7 @@ impl<F: Field> ConstraintSystem<F> {
 
         // Add an additional blinding factor as a slight defense against
         // off-by-one errors.
+        // println!("=== DEBUG (blinding factor): {}", factors+1);
         factors + 1
     }
 

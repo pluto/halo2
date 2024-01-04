@@ -138,7 +138,7 @@ impl<'params, C: CurveAffine>
         if msm.check() {
             Ok(())
         } else {
-            Err(Error::ConstraintSystemFailure)
+            Err(Error::MSMVerificationError)
         }
     }
 

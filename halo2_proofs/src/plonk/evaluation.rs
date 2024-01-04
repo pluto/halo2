@@ -353,6 +353,9 @@ impl<C: CurveAffine> Evaluator<C> {
             .zip(shuffles.iter())
             .zip(permutations.iter())
         {
+
+            // TODO: Investigate how custom gates are flattened. 
+
             // Custom gates
             multicore::scope(|scope| {
                 let chunk_size = (size + num_threads - 1) / num_threads;

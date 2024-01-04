@@ -237,6 +237,7 @@ where
         circuit.params(),
     );
 
+    println!("=== DEBUG (CREATE VK): n={}, min_rows={}, compare={}", params.n(), cs.minimum_rows(), (params.n() as usize) < cs.minimum_rows());
     if (params.n() as usize) < cs.minimum_rows() {
         return Err(Error::not_enough_rows_available(params.k()));
     }
@@ -250,6 +251,8 @@ where
         _marker: std::marker::PhantomData,
     };
 
+    println!("=== DEBUG (CREATE VK): num_fixed_columns={}, k={} cs.degree={}", cs.num_fixed_columns, params.k(), cs.degree());
+
     // Synthesize the circuit to obtain URS
     ConcreteCircuit::FloorPlanner::synthesize(
         &mut assembly,
@@ -262,6 +265,7 @@ where
     let (cs, selector_polys) = if compress_selectors {
         cs.compress_selectors(assembly.selectors.clone())
     } else {
+        println!("=== DEBUG (CREATE VK): not compressing selectors num_selectors={}", cs.num_selectors);
         // After this, the ConstraintSystem should not have any selectors: `verify` does not need them, and `keygen_pk` regenerates `cs` from scratch anyways.
         let selectors = std::mem::take(&mut assembly.selectors);
         cs.directly_convert_selectors_to_fixed(selectors)
@@ -275,6 +279,7 @@ where
     let permutation_vk = assembly
         .permutation
         .build_vk(params, &domain, &cs.permutation);
+    println!("=== DEBUG (CREATE VK): num_permutations_read={}", cs.permutation.columns.len());
 
     let fixed_commitments = fixed
         .iter()

@@ -25,8 +25,8 @@ pub struct VerifierGWC<'params, E: Engine> {
 impl<'params, E> Verifier<'params, KZGCommitmentScheme<E>> for VerifierGWC<'params, E>
 where
     E: MultiMillerLoop + Debug,
-    E::Scalar: PrimeField,
-    E::G1Affine: SerdeCurveAffine,
+    E::Fr: PrimeField,
+    E::G1Affine: SerdeCurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
     E::G2Affine: SerdeCurveAffine,
 {
     type Guard = GuardKZG<'params, E>;
@@ -63,7 +63,7 @@ where
         let u: ChallengeU<_> = transcript.squeeze_challenge_scalar();
 
         let mut commitment_multi = MSMKZG::<E>::new();
-        let mut eval_multi = E::Scalar::ZERO;
+        let mut eval_multi = E::Fr::ZERO;
 
         let mut witness = MSMKZG::<E>::new();
         let mut witness_with_aux = MSMKZG::<E>::new();
@@ -117,6 +117,8 @@ where
         msm_accumulator.right.add_msm(&commitment_multi);
         let g0: E::G1 = self.params.g[0].into();
         msm_accumulator.right.append_term(eval_multi, -g0);
+        
+        println!(" === DEBUG: Halo2 GWC Verifier");
 
         Ok(Self::Guard::new(msm_accumulator))
     }

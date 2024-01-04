@@ -141,13 +141,16 @@ where
         reader.read_exact(&mut num_fixed_columns)?;
         let num_fixed_columns = u32::from_le_bytes(num_fixed_columns);
 
+        println!("=== DEBUG (READ VK): num_fixed_columns={}, k={} cs.degree={}", num_fixed_columns, k, cs.degree());
         let fixed_commitments: Vec<_> = (0..num_fixed_columns)
             .map(|_| C::read(reader, format))
             .collect::<Result<_, _>>()?;
 
+        println!("=== DEBUG (READ VK): num_permutations_read={}", cs.permutation.columns.len());
         let permutation = permutation::VerifyingKey::read(reader, &cs.permutation, format)?;
 
         let (cs, selectors) = if compress_selectors {
+            println!("=== DEBUG (READ VK): Compressing selectors. ");
             // read selectors
             let selectors: Vec<Vec<bool>> = vec![vec![false; 1 << k]; cs.num_selectors]
                 .into_iter()
@@ -163,6 +166,7 @@ where
             let (cs, _) = cs.compress_selectors(selectors.clone());
             (cs, selectors)
         } else {
+            println!("=== DEBUG (READ VK): Not compressing selectors. num_selectors={}", cs.num_selectors);
             // we still need to replace selectors with fixed Expressions in `cs`
             let fake_selectors = vec![vec![]; cs.num_selectors];
             let (cs, _) = cs.directly_convert_selectors_to_fixed(fake_selectors);

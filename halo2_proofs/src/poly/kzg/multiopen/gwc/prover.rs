@@ -25,8 +25,8 @@ pub struct ProverGWC<'params, E: Engine> {
 /// Create a multi-opening proof
 impl<'params, E: Engine + Debug> Prover<'params, KZGCommitmentScheme<E>> for ProverGWC<'params, E>
 where
-    E::Scalar: PrimeField,
-    E::G1Affine: SerdeCurveAffine,
+    E::Fr: PrimeField,
+    E::G1Affine: SerdeCurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
     E::G2Affine: SerdeCurveAffine,
 {
     const QUERY_INSTANCE: bool = false;
@@ -54,7 +54,8 @@ where
     {
         let v: ChallengeV<_> = transcript.squeeze_challenge_scalar();
         let commitment_data = construct_intermediate_sets(queries);
-
+        
+        // Finally commitments of w, wz
         for commitment_at_a_point in commitment_data.iter() {
             let z = commitment_at_a_point.point;
             let (poly_batch, eval_batch) = commitment_at_a_point

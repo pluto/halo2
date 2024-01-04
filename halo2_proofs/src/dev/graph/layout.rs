@@ -210,6 +210,8 @@ impl CircuitLayout {
 
         // Render the regions!
         let mut labels = if self.hide_labels { None } else { Some(vec![]) };
+        let mut max_height = 0;
+        let mut max_label = "";
         for region in &layout.regions {
             if let Some(offset) = region.offset {
                 // Sort the region's columns according to the defined ordering.
@@ -217,13 +219,19 @@ impl CircuitLayout {
                 columns.sort_unstable_by_key(|a| column_index(&cs, *a));
 
                 // Render contiguous parts of the same region as a single box.
-                let mut width = None;
+                let mut width = None;                
                 for column in columns {
                     let column = column_index(&cs, column);
                     match width {
                         Some((start, end)) if end == column => width = Some((start, end + 1)),
                         Some((start, end)) => {
                             draw_region(&root, (start, offset), (end, offset + region.rows))?;
+                            let cur_height = offset + region.rows;
+                            if cur_height >= max_height {
+                                max_height = cur_height;
+                                max_label = region.name.as_str();
+                            }
+                            
                             if let Some(labels) = &mut labels {
                                 labels.push((region.name.clone(), (start, offset)));
                             }
@@ -236,12 +244,20 @@ impl CircuitLayout {
                 // Render the last part of the region.
                 if let Some((start, end)) = width {
                     draw_region(&root, (start, offset), (end, offset + region.rows))?;
+                    let cur_height = offset + region.rows;
+                    if cur_height >= max_height {
+                        max_height = cur_height;
+                        max_label = region.name.as_str();
+                        println!("=== DEBUG (visual): changing max, max_height={}, max_label={}", max_height, max_label);
+                    }
                     if let Some(labels) = &mut labels {
                         labels.push((region.name.clone(), (start, offset)));
                     }
                 }
             }
         }
+
+        println!("=== DEBUG (visual): final max, max_height={}, max_label={}", max_height, max_label);
 
         // Darken the cells of the region that have been assigned to.
         for region in layout.regions {
@@ -294,11 +310,16 @@ impl CircuitLayout {
         ))?;
 
         // Render labels last, on top of everything else.
+        use rand::prelude::*;
+        use rand::Rng;
+        let mut a = rand::thread_rng();
         if let Some(labels) = labels {
             for (label, top_left) in labels {
+                let y = a.gen_range(0..400);
+                // let y = rand::random::<i32>();
                 root.draw(
                     &(EmptyElement::at(top_left)
-                        + Text::new(label, (10, 10), ("sans-serif", 15.0).into_font())),
+                        + Text::new(label, (10, y), ("sans-serif", 15.0).into_font())),
                 )?;
             }
             root.draw(

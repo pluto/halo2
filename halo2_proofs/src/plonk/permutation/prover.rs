@@ -160,6 +160,7 @@ impl Argument {
             }
             let mut z = domain.lagrange_from_vec(z);
             // Set blinding factors
+
             for z in &mut z[params.n() as usize - blinding_factors..] {
                 *z = C::Scalar::random(&mut rng);
             }

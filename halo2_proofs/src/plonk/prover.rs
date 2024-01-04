@@ -65,6 +65,7 @@ where
 
     // Hash verification key into transcript
     pk.vk.hash_into(transcript)?;
+    use ark_std::{end_timer, start_timer};
 
     let domain = &pk.vk.domain;
     let mut meta = ConstraintSystem::default();
@@ -104,6 +105,8 @@ where
                 .collect::<Result<Vec<_>, _>>()?;
 
             if P::QUERY_INSTANCE {
+                let setup_message = format!("=== TIMING: start instance commit len={}", instance_values.len());
+                let start = start_timer!(|| setup_message);
                 let instance_commitments_projective: Vec<_> = instance_values
                     .iter()
                     .map(|poly| params.commit_lagrange(poly, Blind::default()))
@@ -120,8 +123,11 @@ where
                 for commitment in &instance_commitments {
                     transcript.common_point(*commitment)?;
                 }
+                end_timer!(start);
             }
 
+            let setup_message = format!("=== TIMING: instance polys len={}", instance_values.len());
+            let start = start_timer!(|| setup_message);
             let instance_polys: Vec<_> = instance_values
                 .iter()
                 .map(|poly| {
@@ -129,6 +135,7 @@ where
                     domain.lagrange_to_coeff(lagrange_vec)
                 })
                 .collect();
+            end_timer!(start);
 
             Ok(InstanceSingle {
                 instance_values,
@@ -332,13 +339,18 @@ where
                 };
 
                 // Synthesize the circuit to obtain the witness and other information.
+                let setup_message = format!("=== TIMING: synthesise circuit");
+                let start = start_timer!(|| setup_message);
                 ConcreteCircuit::FloorPlanner::synthesize(
                     &mut witness,
                     circuit,
                     config.clone(),
                     meta.constants.clone(),
                 )?;
+                end_timer!(start);
 
+                let setup_message = format!("=== TIMING: batch invert advice");
+                let start = start_timer!(|| setup_message);
                 let mut advice_values = batch_invert_assigned::<Scheme::Scalar>(
                     witness
                         .advice
@@ -353,6 +365,7 @@ where
                         })
                         .collect(),
                 );
+                end_timer!(start);
 
                 // Add blinding factors to advice columns
                 for (column_index, advice_values) in column_indices.iter().zip(&mut advice_values) {
@@ -379,6 +392,9 @@ where
                         }
                     })
                     .collect();
+
+                let setup_message = format!("=== TIMING: advice commitments len={}", advice_values.len());
+                let start = start_timer!(|| setup_message);
                 let advice_commitments_projective: Vec<_> = advice_values
                     .iter()
                     .zip(blinds.iter())
@@ -402,6 +418,7 @@ where
                     advice.advice_polys[*column_index] = advice_values;
                     advice.advice_blinds[*column_index] = blind;
                 }
+                end_timer!(start);
             }
 
             for (index, phase) in meta.challenge_phase.iter().enumerate() {
@@ -424,6 +441,8 @@ where
     // Sample theta challenge for keeping lookup columns linearly independent
     let theta: ChallengeTheta<_> = transcript.squeeze_challenge_scalar();
 
+    let setup_message = format!("=== TIMING: lookups len={}", pk.vk.cs.lookups.len());
+    let start = start_timer!(|| setup_message);
     let lookups: Vec<Vec<lookup::prover::Permuted<Scheme::Curve>>> = instance
         .iter()
         .zip(advice.iter())
@@ -450,6 +469,7 @@ where
                 .collect()
         })
         .collect::<Result<Vec<_>, _>>()?;
+    end_timer!(start);
 
     // Sample beta challenge
     let beta: ChallengeBeta<_> = transcript.squeeze_challenge_scalar();
@@ -457,7 +477,11 @@ where
     // Sample gamma challenge
     let gamma: ChallengeGamma<_> = transcript.squeeze_challenge_scalar();
 
+    // NOTE: Classically "Round 2" begins here. 
+    
     // Commit to permutations.
+    let setup_message = format!("=== TIMING: commit permutations");
+    let start = start_timer!(|| setup_message);
     let permutations: Vec<permutation::prover::Committed<Scheme::Curve>> = instance
         .iter()
         .zip(advice.iter())
@@ -476,7 +500,10 @@ where
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+    end_timer!(start);
 
+    let setup_message = format!("=== TIMING: commit lookups");
+    let start = start_timer!(|| setup_message);
     let lookups: Vec<Vec<lookup::prover::Committed<Scheme::Curve>>> = lookups
         .into_iter()
         .map(|lookups| -> Result<Vec<_>, _> {
@@ -487,7 +514,10 @@ where
                 .collect::<Result<Vec<_>, _>>()
         })
         .collect::<Result<Vec<_>, _>>()?;
+    end_timer!(start);
 
+    let setup_message = format!("=== TIMING: commit shuffles");
+    let start = start_timer!(|| setup_message);
     let shuffles: Vec<Vec<shuffle::prover::Committed<Scheme::Curve>>> = instance
         .iter()
         .zip(advice.iter())
@@ -515,14 +545,20 @@ where
                 .collect::<Result<Vec<_>, _>>()
         })
         .collect::<Result<Vec<_>, _>>()?;
+    end_timer!(start);
 
     // Commit to the vanishing argument's random polynomial for blinding h(x_3)
+    let setup_message = format!("=== TIMING: vanishing poly");
+    let start = start_timer!(|| setup_message);
     let vanishing = vanishing::Argument::commit(params, domain, &mut rng, transcript)?;
+    end_timer!(start);
 
     // Obtain challenge for keeping all separate gates linearly independent
     let y: ChallengeY<_> = transcript.squeeze_challenge_scalar();
 
     // Calculate the advice polys
+    let setup_message = format!("=== TIMING: fft advice poly");
+    let start = start_timer!(|| setup_message);
     let advice: Vec<AdviceSingle<Scheme::Curve, Coeff>> = advice
         .into_iter()
         .map(
@@ -540,8 +576,11 @@ where
             },
         )
         .collect();
+    end_timer!(start);
 
     // Evaluate the h(X) polynomial
+    let setup_message = format!("=== TIMING: evaluating h poly");
+    let start = start_timer!(|| setup_message);
     let h_poly = pk.ev.evaluate_h(
         pk,
         &advice
@@ -561,9 +600,13 @@ where
         &shuffles,
         &permutations,
     );
+    end_timer!(start);
 
     // Construct the vanishing argument's h(X) commitments
+    let setup_message = format!("=== TIMING: constructing vanishing h(x)");
+    let start = start_timer!(|| setup_message);
     let vanishing = vanishing.construct(params, domain, h_poly, &mut rng, transcript)?;
+    end_timer!(start);
 
     let x: ChallengeX<_> = transcript.squeeze_challenge_scalar();
     let xn = x.pow([params.n()]);
@@ -591,6 +634,8 @@ where
     }
 
     // Compute and hash advice evals for each circuit instance
+    let setup_message = format!("=== TIMING: eval advice at omega");
+    let start = start_timer!(|| setup_message);
     for advice in advice.iter() {
         // Evaluate polynomials at omega^i x
         let advice_evals: Vec<_> = meta
@@ -609,8 +654,11 @@ where
             transcript.write_scalar(*eval)?;
         }
     }
+    end_timer!(start);
 
     // Compute and hash fixed evals (shared across all circuit instances)
+    let setup_message = format!("=== TIMING: eval fixed at omega");
+    let start = start_timer!(|| setup_message);
     let fixed_evals: Vec<_> = meta
         .fixed_queries
         .iter()
@@ -623,19 +671,31 @@ where
     for eval in fixed_evals.iter() {
         transcript.write_scalar(*eval)?;
     }
+    end_timer!(start);
 
+    let setup_message = format!("=== TIMING: eval vanishing");
+    let start = start_timer!(|| setup_message);
     let vanishing = vanishing.evaluate(x, xn, domain, transcript)?;
+    end_timer!(start);
 
     // Evaluate common permutation data
+    let setup_message = format!("=== TIMING: eval permutation");
+    let start = start_timer!(|| setup_message);
     pk.permutation.evaluate(x, transcript)?;
+    end_timer!(start);
 
     // Evaluate the permutations, if any, at omega^i x.
+    let setup_message = format!("=== TIMING: eval permutation at omega");
+    let start = start_timer!(|| setup_message);
     let permutations: Vec<permutation::prover::Evaluated<Scheme::Curve>> = permutations
         .into_iter()
         .map(|permutation| -> Result<_, _> { permutation.construct().evaluate(pk, x, transcript) })
         .collect::<Result<Vec<_>, _>>()?;
+    end_timer!(start);
 
     // Evaluate the lookups, if any, at omega^i x.
+    let setup_message = format!("=== TIMING: eval lookups at omega");
+    let start = start_timer!(|| setup_message);
     let lookups: Vec<Vec<lookup::prover::Evaluated<Scheme::Curve>>> = lookups
         .into_iter()
         .map(|lookups| -> Result<Vec<_>, _> {
@@ -645,8 +705,11 @@ where
                 .collect::<Result<Vec<_>, _>>()
         })
         .collect::<Result<Vec<_>, _>>()?;
+    end_timer!(start);
 
     // Evaluate the shuffles, if any, at omega^i x.
+    let setup_message = format!("=== TIMING: eval shuffles at omega");
+    let start = start_timer!(|| setup_message);
     let shuffles: Vec<Vec<shuffle::prover::Evaluated<Scheme::Curve>>> = shuffles
         .into_iter()
         .map(|shuffles| -> Result<Vec<_>, _> {
@@ -656,7 +719,10 @@ where
                 .collect::<Result<Vec<_>, _>>()
         })
         .collect::<Result<Vec<_>, _>>()?;
+    end_timer!(start);
 
+    let setup_message = format!("=== TIMING: compute opening");
+    let start = start_timer!(|| setup_message);
     let instances = instance
         .iter()
         .zip(advice.iter())
@@ -706,11 +772,16 @@ where
         .chain(pk.permutation.open(x))
         // We query the h(X) polynomial at x
         .chain(vanishing.open(x));
+    end_timer!(start);
 
+    let setup_message = format!("=== TIMING: create final proof");
+    let start = start_timer!(|| setup_message);
     let prover = P::new(params);
-    prover
+    let r = prover
         .create_proof(rng, transcript, instances)
-        .map_err(|_| Error::ConstraintSystemFailure)
+        .map_err(|_| Error::ConstraintSystemFailure);
+    end_timer!(start);
+    r
 }
 
 #[test]
